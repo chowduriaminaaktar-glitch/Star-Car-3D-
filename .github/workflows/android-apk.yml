@@ -44,14 +44,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
 
-      - name: Build web bundle and sync Android offline assets
+      - name: Install dependencies, build web bundle, and sync Android assets
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install --no-audit --no-fund
-          fi
+          npm ci
           npm run build:android
           if [ ! -f android/app/src/main/assets/www/index.html ]; then
             echo "::error::Synced Android web assets missing index.html"
