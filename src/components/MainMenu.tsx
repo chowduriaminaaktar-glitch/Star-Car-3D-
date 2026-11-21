@@ -3,6 +3,7 @@ import {
   CloudFog,
   CloudRain,
   CloudSnow,
+  Info,
   Maximize2,
   Minimize2,
   Moon,
@@ -17,6 +18,7 @@ import {
 import { CarSpec, GameSettings, WeatherMode } from '../game/types';
 import { ViewportInfo } from '../game/viewport';
 import { CoinBadge } from './CoinBadge';
+import { BrandLogo } from './BrandLogo';
 import { audioEngine } from '../game/audio';
 
 interface MainMenuProps {
@@ -31,6 +33,7 @@ interface MainMenuProps {
   onOpenGarage: () => void;
   onOpenCustomize: () => void;
   onOpenSettings: () => void;
+  onOpenAbout: () => void;
   onToggleTimeOfDay: () => void;
   onSelectWeather: (mode: WeatherMode) => void;
   onToggleFullscreen: () => void;
@@ -56,6 +59,7 @@ export function MainMenu({
   onOpenGarage,
   onOpenCustomize,
   onOpenSettings,
+  onOpenAbout,
   onToggleTimeOfDay,
   onSelectWeather,
   onToggleFullscreen,
@@ -91,17 +95,16 @@ export function MainMenu({
             )}
           </div>
 
-          {/* Center Title in Landscape */}
+          {/* Top-Center STAR CAR 3D Brand Logo in Landscape */}
           {!isPortrait && (
-            <div className="text-center select-none min-w-0">
-              <h1
-                className={`font-display font-bold italic tracking-wider text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.85)] leading-none ${
-                  compactLand ? 'text-2xl sm:text-3xl' : 'text-4xl md:text-5xl lg:text-6xl'
-                }`}
-              >
-                STAR CAR <span className="text-amber-400">3D</span>
-              </h1>
-              <p className="mt-1 text-xs sm:text-sm font-medium text-slate-200 tracking-wide drop-shadow truncate">
+            <div className="flex flex-col items-center text-center select-none min-w-0 -mt-1">
+              <BrandLogo
+                size={compactLand ? 'heroCompact' : 'hero'}
+                glow
+                animateIn
+                priority
+              />
+              <p className="mt-0.5 text-[11px] sm:text-xs font-medium text-slate-200 tracking-wide drop-shadow truncate">
                 {selectedCar.name} · {selectedCar.classLabel}
               </p>
             </div>
@@ -162,16 +165,27 @@ export function MainMenu({
               <Settings className="w-4 h-4 text-slate-300" />
               <span className="hidden md:inline">Settings</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                audioEngine.playClick();
+                onOpenAbout();
+              }}
+              aria-label="About STAR CAR 3D"
+              title="About STAR CAR 3D"
+              className="inline-flex items-center justify-center p-2.5 rounded-xl bg-slate-950/88 hover:bg-slate-900 border border-white/15 text-slate-200 transition-colors shrink-0 cursor-pointer"
+            >
+              <Info className="w-4 h-4 text-sky-400" />
+            </button>
           </div>
         </div>
 
-        {/* Dedicated Title Row in Portrait so it never crowds Coins/Buttons */}
+        {/* Dedicated Top-Center Logo Row in Portrait so it never crowds Coins/Buttons */}
         {isPortrait && (
-          <div className="text-center select-none mt-2">
-            <h1 className="font-display text-4xl sm:text-5xl font-bold italic tracking-wider text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.85)] leading-none">
-              STAR CAR <span className="text-amber-400">3D</span>
-            </h1>
-            <p className="mt-1.5 text-xs sm:text-sm font-medium text-slate-200 tracking-wide drop-shadow">
+          <div className="flex flex-col items-center text-center select-none mt-1">
+            <BrandLogo size="hero" glow animateIn priority />
+            <p className="mt-1 text-xs sm:text-sm font-medium text-slate-200 tracking-wide drop-shadow">
               {selectedCar.name} · {selectedCar.classLabel}
             </p>
           </div>

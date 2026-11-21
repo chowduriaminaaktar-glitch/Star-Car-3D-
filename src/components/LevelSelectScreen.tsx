@@ -8,6 +8,7 @@ import {
 } from '../game/types';
 import { ViewportInfo } from '../game/viewport';
 import { audioEngine } from '../game/audio';
+import { BrandLogo } from './BrandLogo';
 import { CoinBadge } from './CoinBadge';
 import trafficArt from '../assets/images/level_traffic_highway_1795234763124.jpg';
 import offroadArt from '../assets/images/level_offroad_trail_1795234763854.jpg';
@@ -77,17 +78,24 @@ export function LevelSelectScreen({
           <span>BACK</span>
         </button>
 
-        <div className="text-center min-w-0">
-          <h1
-            className={`font-display font-extrabold tracking-wider text-white leading-none ${
-              compactLand ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-4xl'
-            }`}
-          >
-            CHOOSE YOUR <span className="text-amber-400">LEVEL</span>
-          </h1>
-          <div className="text-[11px] sm:text-xs text-slate-300 mt-1 truncate">
-            Active Car: <span className="text-white font-semibold">{selectedCar.name}</span> ·{' '}
-            <span className="text-sky-400">{selectedCar.topSpeedKmh} km/h</span>
+        <div
+          className={`min-w-0 flex items-center justify-center ${
+            compactLand ? 'flex-row gap-2.5' : 'flex-col text-center'
+          }`}
+        >
+          <BrandLogo size="header" className="shrink-0" />
+          <div className={compactLand ? 'text-left min-w-0' : 'text-center min-w-0'}>
+            <h1
+              className={`font-display font-extrabold tracking-wider text-white leading-none ${
+                compactLand ? 'text-lg sm:text-2xl' : 'text-xl sm:text-3xl'
+              }`}
+            >
+              CHOOSE YOUR <span className="text-amber-400">LEVEL</span>
+            </h1>
+            <div className="text-[11px] sm:text-xs text-slate-300 mt-1 truncate">
+              Active Car: <span className="text-white font-semibold">{selectedCar.name}</span> ·{' '}
+              <span className="text-sky-400">{selectedCar.topSpeedKmh} km/h</span>
+            </div>
           </div>
         </div>
 

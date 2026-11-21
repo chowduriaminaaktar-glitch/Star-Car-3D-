@@ -1,6 +1,7 @@
 import { ArrowLeft, Check, Coins, Paintbrush, ShoppingBag } from 'lucide-react';
 import { CAR_CATALOG, CarSpec } from '../game/types';
 import { ViewportInfo } from '../game/viewport';
+import { BrandLogo } from './BrandLogo';
 import { CoinBadge } from './CoinBadge';
 import { audioEngine } from '../game/audio';
 
@@ -104,8 +105,11 @@ export function GarageStoreModal({
           </button>
         </div>
 
-        <div className="hidden lg:block text-xs text-slate-200 bg-slate-950/85 border border-white/10 rounded-lg px-3 py-2">
-          Drag anywhere on car to rotate 3D preview
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="hidden lg:block text-xs text-slate-200 bg-slate-950/85 border border-white/10 rounded-lg px-3 py-2">
+            Drag anywhere on car to rotate 3D preview
+          </div>
+          <BrandLogo size="header" />
         </div>
       </div>
 

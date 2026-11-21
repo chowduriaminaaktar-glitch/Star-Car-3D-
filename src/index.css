@@ -97,3 +97,110 @@
     radial-gradient(2px 6px at 62% 84%, rgba(224, 242, 254, 0.36), transparent);
   animation: rain-glass-drop 1.4s ease-in-out infinite;
 }
+
+/* STAR CAR 3D Logo entrance & subtle blue glow animations */
+@keyframes sc-logo-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sc-logo-blue-halo {
+  0%,
+  100% {
+    opacity: 0.48;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes sc-logo-drop-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.42))
+      drop-shadow(0 6px 18px rgba(2, 6, 23, 0.72));
+  }
+  50% {
+    filter: drop-shadow(0 0 22px rgba(56, 189, 248, 0.72))
+      drop-shadow(0 8px 24px rgba(37, 99, 235, 0.55));
+  }
+}
+
+.sc-logo-fade-in {
+  animation: sc-logo-fade-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sc-logo-halo {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(56, 189, 248, 0.42) 0%,
+    rgba(37, 99, 235, 0.22) 45%,
+    transparent 72%
+  );
+  animation: sc-logo-blue-halo 2.8s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+
+.sc-logo-glow {
+  animation: sc-logo-drop-glow 2.8s ease-in-out infinite;
+}
+
+/* Loading screen racing track motion */
+@keyframes sc-loading-road-scroll {
+  0% {
+    transform: perspective(380px) rotateX(62deg) translateY(0);
+  }
+  100% {
+    transform: perspective(380px) rotateX(62deg) translateY(80px);
+  }
+}
+
+@keyframes sc-loading-streak {
+  0% {
+    transform: translateX(-25%);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.55;
+  }
+  75% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: translateX(125%);
+    opacity: 0;
+  }
+}
+
+.sc-loading-grid {
+  background-image:
+    linear-gradient(to right, rgba(56, 189, 248, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(56, 189, 248, 0.22) 1px, transparent 1px);
+  background-size: 64px 80px;
+  animation: sc-loading-road-scroll 0.85s linear infinite;
+}
+
+.sc-loading-streak {
+  animation: sc-loading-streak 2.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-logo-fade-in,
+  .sc-logo-halo,
+  .sc-logo-glow,
+  .sc-loading-grid,
+  .sc-loading-streak,
+  .nitro-speedlines,
+  .rain-windshield {
+    animation: none !important;
+  }
+}
+

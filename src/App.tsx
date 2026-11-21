@@ -32,6 +32,8 @@ import { GarageStoreModal } from './components/GarageStoreModal';
 import { CustomizationPanel } from './components/CustomizationPanel';
 import { SettingsModal } from './components/SettingsModal';
 import { GameOverModal, PauseOverlay } from './components/Overlays';
+import { LoadingScreen } from './components/LoadingScreen';
+import { AboutModal } from './components/AboutModal';
 
 const INITIAL_HUD: HudSnapshot = {
   levelId: 'TRAFFIC',
@@ -75,6 +77,8 @@ export default function App() {
   const [finalHud, setFinalHud] = useState<HudSnapshot>(INITIAL_HUD);
   const [isNewBest, setIsNewBest] = useState(false);
   const [contextLost, setContextLost] = useState(false);
+  const [engineReady, setEngineReady] = useState(false);
+  const [showLoading, setShowLoading] = useState(true);
 
   const updateSave = useCallback((updater: (prev: SaveData) => SaveData) => {
     setSaveData((prev) => {
@@ -150,6 +154,7 @@ export default function App() {
     );
 
     engineRef.current = engine;
+    setEngineReady(true);
     notifyAndroidGameReady();
 
     return () => {
@@ -179,7 +184,8 @@ export default function App() {
         curr === 'STORE' ||
         curr === 'GARAGE' ||
         curr === 'CUSTOMIZATION' ||
-        curr === 'GAME_OVER'
+        curr === 'GAME_OVER' ||
+        curr === 'ABOUT'
       ) {
         setGameState('MAIN_MENU');
       } else {
@@ -396,6 +402,7 @@ export default function App() {
           onOpenGarage={handleOpenGarage}
           onOpenCustomize={() => handleOpenCustomize()}
           onOpenSettings={() => handleOpenSettings('MAIN_MENU')}
+          onOpenAbout={() => setGameState('ABOUT')}
           onToggleTimeOfDay={() =>
             handleUpdateSettings({
               ...saveData.settings,
@@ -520,6 +527,11 @@ export default function App() {
         />
       )}
 
+      {/* ABOUT */}
+      {gameState === 'ABOUT' && (
+        <AboutModal onClose={() => setGameState('MAIN_MENU')} />
+      )}
+
       {/* GAME_OVER */}
       {gameState === 'GAME_OVER' && (
         <GameOverModal
@@ -530,6 +542,14 @@ export default function App() {
           onRestart={handleRestart}
           onChangeLevel={handleChangeLevel}
           onHome={handleHome}
+        />
+      )}
+
+      {/* STARTUP LOADING SCREEN */}
+      {showLoading && (
+        <LoadingScreen
+          engineReady={engineReady}
+          onComplete={() => setShowLoading(false)}
         />
       )}
     </div>

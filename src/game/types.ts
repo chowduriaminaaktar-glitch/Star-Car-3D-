@@ -7,7 +7,8 @@ export type GameState =
   | 'STORE'
   | 'GARAGE'
   | 'CUSTOMIZATION'
-  | 'SETTINGS';
+  | 'SETTINGS'
+  | 'ABOUT';
 
 export type LevelId = 'TRAFFIC' | 'OFFROAD' | 'OBSTACLES';
 

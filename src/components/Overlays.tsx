@@ -1,6 +1,7 @@
 import { Home, Layers, Play, RotateCcw, Settings, Trophy } from 'lucide-react';
 import { HudSnapshot, LEVEL_CATALOG, LevelId } from '../game/types';
 import { audioEngine } from '../game/audio';
+import { BrandLogo } from './BrandLogo';
 
 interface PauseOverlayProps {
   levelId: LevelId;
@@ -23,7 +24,8 @@ export function PauseOverlay({
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/78 p-4">
-      <div className="w-full max-w-sm bg-slate-900 border border-white/15 rounded-2xl p-5 sm:p-6 shadow-2xl text-center">
+      <div className="w-full max-w-sm bg-slate-900 border border-white/15 rounded-2xl p-5 sm:p-6 shadow-2xl text-center max-h-[92dvh] overflow-y-auto sc-scroll">
+        <BrandLogo size="modal" glow className="mx-auto mb-1.5" />
         <div className="text-[11px] font-display font-bold tracking-widest text-amber-400 uppercase">
           {levelSpec.code} · {levelSpec.title}
         </div>
@@ -122,8 +124,9 @@ export function GameOverModal({
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/82 p-4">
-      <div className="w-full max-w-md bg-slate-900 border border-white/15 rounded-2xl p-5 sm:p-6 shadow-2xl">
+      <div className="w-full max-w-md bg-slate-900 border border-white/15 rounded-2xl p-5 sm:p-6 shadow-2xl max-h-[92dvh] overflow-y-auto sc-scroll">
         <div className="text-center">
+          <BrandLogo size="modal" className="mx-auto mb-2" />
           <div className="inline-block text-[11px] font-display font-bold tracking-widest uppercase text-sky-400 bg-slate-950/90 border border-white/10 rounded-lg px-3 py-1 mb-2">
             {levelSpec.code} · {levelSpec.title}
           </div>
