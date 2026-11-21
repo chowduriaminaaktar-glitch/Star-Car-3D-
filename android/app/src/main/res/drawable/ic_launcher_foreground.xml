@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Golden Star Emblem behind sports car -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M54,20 L60.2,35.6 L77,36.8 L64.1,47.6 L68.2,64 L54,55 L39.8,64 L43.9,47.6 L31,36.8 L47.8,35.6 Z" />
+
+    <!-- Sleek Red Racing Sports Car Silhouette -->
+    <path
+        android:fillColor="#EF4444"
+        android:pathData="M24,68 L28,58 L41,51 L65,51 L78,58 L84,65 L84,72 L24,72 Z" />
+
+    <!-- Tinted Windshield & Cabin Glass -->
+    <path
+        android:fillColor="#0B1220"
+        android:pathData="M41,53 L64,53 L71,59 L35,59 Z" />
+
+    <!-- Cyan Nitro Accent Stripe -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M26,64 L82,64 L82,66.5 L26,66.5 Z" />
+
+    <!-- Front & Rear Tires -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M34,72 m-6.5,0 a6.5,6.5 0 1,0 13,0 a6.5,6.5 0 1,0 -13,0" />
+    <path
+        android:fillColor="#CBD5E1"
+        android:pathData="M34,72 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" />
+
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M73,72 m-6.5,0 a6.5,6.5 0 1,0 13,0 a6.5,6.5 0 1,0 -13,0" />
+    <path
+        android:fillColor="#CBD5E1"
+        android:pathData="M73,72 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" />
+
+    <!-- Headlight glow -->
+    <path
+        android:fillColor="#FEF08A"
+        android:pathData="M79,61 L84,62 L84,64.5 L79,64 Z" />
+</vector>

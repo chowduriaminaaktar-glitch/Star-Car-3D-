@@ -1,0 +1,6 @@
+{
+  "name": "STAR CAR 3D",
+  "description": "A realistic 3D endless three-lane highway racing game with dynamic weather, night mode, nitro boost, car store, garage, and full 3D customization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

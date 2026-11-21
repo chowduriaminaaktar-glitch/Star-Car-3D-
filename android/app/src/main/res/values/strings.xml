@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">STAR CAR 3D</string>
+    <string name="loading_subtitle">Starting 3D Highway Engine…</string>
+    <string name="error_title">Graphics Context Interrupted</string>
+    <string name="error_load_failed">Could not initialize local game assets. Please tap Retry.</string>
+    <string name="error_webgl_lost">The 3D WebGL graphics process stopped unexpectedly. Tap Retry to resume.</string>
+    <string name="action_retry">Retry</string>
+</resources>

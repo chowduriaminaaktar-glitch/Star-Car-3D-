@@ -1,0 +1,353 @@
+name: Build STAR CAR 3D Android APK
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Optional Android versionName override (e.g. 1.0.1)'
+        required: false
+        type: string
+      version_code:
+        description: 'Optional Android versionCode override (positive integer)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+
+jobs:
+  build-apk:
+    name: Build & Verify Android APK
+    runs-on: ubuntu-latest
+    outputs:
+      version_name: ${{ steps.version.outputs.version_name }}
+      version_code: ${{ steps.version.outputs.version_code }}
+      release_asset_name: ${{ steps.prepare_release.outputs.asset_name }}
+      release_build_kind: ${{ steps.prepare_release.outputs.build_kind }}
+      release_apk_sha256: ${{ steps.prepare_release.outputs.sha256 }}
+      release_apk_size: ${{ steps.prepare_release.outputs.size }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build web bundle and sync Android offline assets
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+          npm run build:android
+          if [ ! -f android/app/src/main/assets/www/index.html ]; then
+            echo "::error::Synced Android web assets missing index.html"
+            exit 1
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35 platforms and build-tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle & cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Prepare Gradle wrapper
+        working-directory: android
+        run: |
+          if [ -x "./gradlew" ] && [ -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Using repository Gradle wrapper."
+            chmod +x ./gradlew
+          else
+            echo "Generating Gradle 8.9 wrapper from android/gradle/wrapper/gradle-wrapper.properties..."
+            gradle wrapper --gradle-version 8.9
+            chmod +x ./gradlew
+          fi
+          ./gradlew --version
+
+      - name: Resolve version metadata
+        id: version
+        run: |
+          GRADLE_ARGS=""
+          VERSION_NAME=$(grep -E '^\s*versionName\s*=' android/app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/' | head -n1)
+          VERSION_CODE=$(grep -E '^\s*versionCode\s*=' android/app/build.gradle.kts | sed -E 's/.*=\s*[^0-9]*([0-9]+).*/\1/' | head -n1)
+          VERSION_NAME="${VERSION_NAME:-1.0.0}"
+          VERSION_CODE="${VERSION_CODE:-1}"
+
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG_VER="${GITHUB_REF_NAME#v}"
+            VERSION_NAME="$TAG_VER"
+            GRADLE_ARGS="$GRADLE_ARGS -PversionName=$TAG_VER"
+          fi
+
+          INPUT_VER_NAME="${{ inputs.version_name }}"
+          INPUT_VER_CODE="${{ inputs.version_code }}"
+
+          if [ -n "$INPUT_VER_NAME" ]; then
+            VERSION_NAME="$INPUT_VER_NAME"
+            GRADLE_ARGS="$GRADLE_ARGS -PversionName=$INPUT_VER_NAME"
+          fi
+
+          if [ -n "$INPUT_VER_CODE" ]; then
+            if ! [[ "$INPUT_VER_CODE" =~ ^[0-9]+$ ]] || [ "$INPUT_VER_CODE" -le 0 ]; then
+              echo "::error::version_code input must be a positive integer, got: $INPUT_VER_CODE"
+              exit 1
+            fi
+            VERSION_CODE="$INPUT_VER_CODE"
+            GRADLE_ARGS="$GRADLE_ARGS -PversionCode=$INPUT_VER_CODE"
+          fi
+
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "gradle_args=$GRADLE_ARGS" >> "$GITHUB_OUTPUT"
+          echo "Resolved versionName=$VERSION_NAME, versionCode=$VERSION_CODE"
+
+      - name: Remove any stale APK build outputs
+        run: rm -rf android/app/build/outputs/apk
+
+      - name: Build Debug APK
+        working-directory: android
+        run: |
+          ./gradlew :app:assembleDebug ${{ steps.version.outputs.gradle_args }} --no-daemon --stacktrace
+
+      - name: Verify Debug APK
+        id: verify_debug
+        run: |
+          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "::error::Build succeeded but debug APK is missing at $APK_PATH"
+            exit 1
+          fi
+          APK_SIZE=$(stat -c%s "$APK_PATH")
+          if [ "$APK_SIZE" -le 0 ]; then
+            echo "::error::Debug APK is empty (0 bytes): $APK_PATH"
+            exit 1
+          fi
+          if ! unzip -t "$APK_PATH" >/dev/null 2>&1; then
+            echo "::error::Debug APK failed archive integrity check: $APK_PATH"
+            exit 1
+          fi
+          APK_SHA256=$(sha256sum "$APK_PATH" | awk '{print $1}')
+          echo "path=$APK_PATH" >> "$GITHUB_OUTPUT"
+          echo "size=$APK_SIZE" >> "$GITHUB_OUTPUT"
+          echo "sha256=$APK_SHA256" >> "$GITHUB_OUTPUT"
+          echo "Verified Debug APK: $APK_PATH ($APK_SIZE bytes, SHA-256: $APK_SHA256)"
+
+      - name: Check optional release signing credentials
+        id: signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && \
+             [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && \
+             [ -n "$ANDROID_KEY_ALIAS" ] && \
+             [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            KEYSTORE_PATH="${{ runner.temp }}/starcar3d-release.jks"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+            if [ ! -s "$KEYSTORE_PATH" ]; then
+              echo "::error::Decoded release keystore file is empty."
+              exit 1
+            fi
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "keystore_path=$KEYSTORE_PATH" >> "$GITHUB_OUTPUT"
+            echo "Release signing credentials detected; release APK will be signed."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Release signing secrets not configured; skipping signed release APK build."
+          fi
+
+      - name: Build Signed Release APK
+        if: steps.signing.outputs.enabled == 'true'
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.keystore_path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew :app:assembleRelease ${{ steps.version.outputs.gradle_args }} --no-daemon --stacktrace
+
+      - name: Verify Signed Release APK
+        id: verify_release
+        if: steps.signing.outputs.enabled == 'true'
+        run: |
+          REL_APK="android/app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$REL_APK" ]; then
+            echo "::error::Signed release APK not found at $REL_APK"
+            exit 1
+          fi
+          REL_SIZE=$(stat -c%s "$REL_APK")
+          if [ "$REL_SIZE" -le 0 ]; then
+            echo "::error::Signed release APK is empty (0 bytes): $REL_APK"
+            exit 1
+          fi
+          if ! unzip -t "$REL_APK" >/dev/null 2>&1; then
+            echo "::error::Signed release APK failed archive integrity check: $REL_APK"
+            exit 1
+          fi
+          REL_SHA256=$(sha256sum "$REL_APK" | awk '{print $1}')
+          echo "built=true" >> "$GITHUB_OUTPUT"
+          echo "path=$REL_APK" >> "$GITHUB_OUTPUT"
+          echo "size=$REL_SIZE" >> "$GITHUB_OUTPUT"
+          echo "sha256=$REL_SHA256" >> "$GITHUB_OUTPUT"
+          echo "Verified Release APK: $REL_APK ($REL_SIZE bytes, SHA-256: $REL_SHA256)"
+
+      - name: Clean up temporary release keystore
+        if: always()
+        run: rm -f "${{ runner.temp }}/starcar3d-release.jks"
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: STAR-CAR-3D-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Signed Release APK Artifact
+        if: steps.verify_release.outputs.built == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: STAR-CAR-3D-RELEASE-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Stage APK for Tag Release
+        id: prepare_release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p release-staging
+          ASSET_NAME="STAR-CAR-3D-${GITHUB_REF_NAME}.apk"
+          if [ "${{ steps.verify_release.outputs.built }}" = "true" ]; then
+            SRC_APK="android/app/build/outputs/apk/release/app-release.apk"
+            BUILD_KIND="Signed Release APK"
+            APK_SIZE="${{ steps.verify_release.outputs.size }}"
+            APK_SHA256="${{ steps.verify_release.outputs.sha256 }}"
+          else
+            SRC_APK="android/app/build/outputs/apk/debug/app-debug.apk"
+            BUILD_KIND="Debug APK (signing secrets not configured)"
+            APK_SIZE="${{ steps.verify_debug.outputs.size }}"
+            APK_SHA256="${{ steps.verify_debug.outputs.sha256 }}"
+          fi
+
+          if [ ! -s "$SRC_APK" ]; then
+            echo "::error::Cannot stage missing or empty APK for GitHub Release: $SRC_APK"
+            exit 1
+          fi
+
+          cp "$SRC_APK" "release-staging/$ASSET_NAME"
+          echo "asset_name=$ASSET_NAME" >> "$GITHUB_OUTPUT"
+          echo "build_kind=$BUILD_KIND" >> "$GITHUB_OUTPUT"
+          echo "size=$APK_SIZE" >> "$GITHUB_OUTPUT"
+          echo "sha256=$APK_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Staged Release Bundle
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: STAR-CAR-3D-RELEASE-BUNDLE
+          path: release-staging/STAR-CAR-3D-${{ github.ref_name }}.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  github-release:
+    name: Publish GitHub Release
+    needs: build-apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download staged release APK
+        uses: actions/download-artifact@v4
+        with:
+          name: STAR-CAR-3D-RELEASE-BUNDLE
+          path: release-dist
+
+      - name: Verify release APK and publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          ASSET_NAME: ${{ needs.build-apk.outputs.release_asset_name }}
+          VERSION_NAME: ${{ needs.build-apk.outputs.version_name }}
+          VERSION_CODE: ${{ needs.build-apk.outputs.version_code }}
+          BUILD_KIND: ${{ needs.build-apk.outputs.release_build_kind }}
+          APK_SIZE: ${{ needs.build-apk.outputs.release_apk_size }}
+          APK_SHA256: ${{ needs.build-apk.outputs.release_apk_sha256 }}
+        run: |
+          APK_FILE="release-dist/$ASSET_NAME"
+          if [ ! -f "$APK_FILE" ]; then
+            echo "::error::Staged release APK is missing: $APK_FILE"
+            exit 1
+          fi
+          ACTUAL_SIZE=$(stat -c%s "$APK_FILE")
+          if [ "$ACTUAL_SIZE" -le 0 ]; then
+            echo "::error::Staged release APK is empty (0 bytes): $APK_FILE"
+            exit 1
+          fi
+          if ! unzip -t "$APK_FILE" >/dev/null 2>&1; then
+            echo "::error::Staged release APK failed integrity verification: $APK_FILE"
+            exit 1
+          fi
+
+          SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $ACTUAL_SIZE / (1024 * 1024)}")
+
+          cat <<EOF > release-notes.md
+          ## STAR CAR 3D $TAG_NAME
+
+          Automated Android APK build for **STAR CAR 3D**.
+
+          ### Version & Build Details
+          - **Application ID:** \`com.starcar3d.game\`
+          - **Version Name:** \`$VERSION_NAME\`
+          - **Version Code:** \`$VERSION_CODE\`
+          - **APK File:** \`$ASSET_NAME\`
+          - **Build Type:** $BUILD_KIND
+          - **File Size:** $SIZE_MB MB ($ACTUAL_SIZE bytes)
+          - **SHA-256:** \`$APK_SHA256\`
+          - **Commit:** \`${{ github.sha }}\`
+          - **Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          ### Installation (Android 7.0+)
+          Download \`$ASSET_NAME\` on your Android device and allow installation from your browser or file manager if prompted.
+          EOF
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Release $TAG_NAME already exists; updating existing release asset without creating a duplicate."
+            gh release upload "$TAG_NAME" "$APK_FILE" --clobber
+            gh release edit "$TAG_NAME" --notes-file release-notes.md
+          else
+            gh release create "$TAG_NAME" "$APK_FILE" \
+              --title "STAR CAR 3D $TAG_NAME" \
+              --notes-file release-notes.md
+          fi

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="sc_bg_dark">#020617</color>
+    <color name="sc_surface">#0F172A</color>
+    <color name="sc_accent_amber">#FBBF24</color>
+    <color name="sc_accent_sky">#38BDF8</color>
+    <color name="sc_text_primary">#F8FAFC</color>
+    <color name="sc_text_muted">#94A3B8</color>
+</resources>

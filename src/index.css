@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Chakra Petch', sans-serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: var(--font-sans);
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono-tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom thin dark scrollbar for store/customizer drawers */
+.sc-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.sc-scroll::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+.sc-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 3px;
+}
+
+/* Nitro radial speed lines (pure CSS opacity/transform animation) */
+@keyframes speedlines-streak {
+  0% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+}
+
+.nitro-speedlines {
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    rgba(56, 189, 248, 0.16) 0deg 1.2deg,
+    transparent 1.2deg 9deg
+  );
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 42%, black 85%);
+  mask-image: radial-gradient(circle at 50% 50%, transparent 42%, black 85%);
+  animation: speedlines-streak 0.24s linear infinite;
+}
+
+/* Subtle rain screen streaks */
+@keyframes rain-glass-drop {
+  0% {
+    transform: translateY(-10%);
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(15%);
+    opacity: 0.25;
+  }
+}
+
+.rain-windshield {
+  background-image:
+    radial-gradient(2px 6px at 14% 22%, rgba(224, 242, 254, 0.45), transparent),
+    radial-gradient(2px 8px at 84% 18%, rgba(224, 242, 254, 0.4), transparent),
+    radial-gradient(2px 7px at 26% 72%, rgba(224, 242, 254, 0.38), transparent),
+    radial-gradient(2px 9px at 76% 64%, rgba(224, 242, 254, 0.42), transparent),
+    radial-gradient(1.5px 5px at 42% 14%, rgba(224, 242, 254, 0.32), transparent),
+    radial-gradient(2px 6px at 62% 84%, rgba(224, 242, 254, 0.36), transparent);
+  animation: rain-glass-drop 1.4s ease-in-out infinite;
+}
