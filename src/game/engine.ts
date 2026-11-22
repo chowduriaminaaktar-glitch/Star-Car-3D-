@@ -553,7 +553,8 @@ export class StarCarEngine {
     this.laneAnimProgress = 0;
     this.playerX = 0;
     this.prevPlayerX = 0;
-    this.speedMs = 24; // ~86 km/h rolling start
+    const startCruiseMs = Math.min(20, (this.currentSpec.topSpeedKmh / 3.6) * 0.30);
+    this.speedMs = startCruiseMs; // ~72 km/h rolling highway start
     this.distanceMeters = 0;
     this.score = 0;
     this.coinsThisRun = 0;
@@ -632,7 +633,11 @@ export class StarCarEngine {
   }
 
   public setThrottle(active: boolean): void {
-    this.throttlePressed = active && this.gameState === 'PLAYING';
+    const next = active && this.gameState === 'PLAYING';
+    if (this.throttlePressed !== next) {
+      this.throttlePressed = next;
+      this.hudEmitAccum = 0.025;
+    }
   }
 
   public setBrake(active: boolean): void {
@@ -640,7 +645,10 @@ export class StarCarEngine {
     if (next) {
       this.nitroLatched = false;
     }
-    this.brakePressed = next;
+    if (this.brakePressed !== next) {
+      this.brakePressed = next;
+      this.hudEmitAccum = 0.025;
+    }
   }
 
   public setNitro(active: boolean): void {
@@ -1045,27 +1053,34 @@ export class StarCarEngine {
       this.hudEmitAccum = 0.033;
     }
 
-    // Speed & Acceleration Physics (allows full deceleration down to 0 km/h when braking)
+    // Single authoritative vehicle speed physics loop (braking priority > nitro > throttle > coast down)
     const specTopMs = (this.currentSpec.topSpeedKmh / 3.6) * surfaceSpeedMult;
-    const baseCruiseMs = specTopMs * 0.62 + Math.min(18, this.distanceMeters * 0.004);
-    const maxSpeedMs = this.nitroActive
-      ? specTopMs * (1.16 + (this.currentSpec.nitroPower / 100) * 0.14)
-      : this.throttlePressed
-        ? specTopMs
-        : this.brakePressed
-          ? 0
-          : baseCruiseMs;
+    const nitroTopMs = specTopMs * (1.16 + (this.currentSpec.nitroPower / 100) * 0.14);
 
     const accelRate =
-      (14 + (this.currentSpec.acceleration / 100) * 20) * (this.nitroActive ? 2.25 : 1.0);
+      (12 + (this.currentSpec.acceleration / 100) * 16) * (this.nitroActive ? 2.15 : 1.0);
     const brakeRate = 58 * combinedGrip;
+    const coastDragRate = 4.2;
 
-    if (this.brakePressed && !this.nitroActive) {
+    if (this.brakePressed) {
+      // Braking always has priority over throttle/nitro and smoothly stops down to 0 km/h
       this.speedMs = Math.max(0, this.speedMs - brakeRate * dt);
-    } else if (this.speedMs < maxSpeedMs) {
-      this.speedMs = Math.min(maxSpeedMs, this.speedMs + accelRate * dt);
+    } else if (this.nitroActive) {
+      if (this.speedMs < nitroTopMs) {
+        this.speedMs = Math.min(nitroTopMs, this.speedMs + accelRate * dt);
+      } else {
+        this.speedMs = THREE.MathUtils.damp(this.speedMs, nitroTopMs, 2.5, dt);
+      }
+    } else if (this.throttlePressed) {
+      // Accelerator held: continuously accelerate toward the vehicle's maximum speed
+      if (this.speedMs < specTopMs) {
+        this.speedMs = Math.min(specTopMs, this.speedMs + accelRate * dt);
+      } else {
+        this.speedMs = Math.max(specTopMs, this.speedMs - coastDragRate * dt);
+      }
     } else {
-      this.speedMs = THREE.MathUtils.damp(this.speedMs, maxSpeedMs, 2.2, dt);
+      // Accelerator released: stop accelerating and naturally coast down
+      this.speedMs = Math.max(0, this.speedMs - coastDragRate * dt);
     }
 
     const travelDelta = this.speedMs * dt;
@@ -1137,10 +1152,11 @@ export class StarCarEngine {
       this.playerCar.setNightHeadlights(this.nightFactor);
     }
 
-    // Third-person chase camera tuned for Landscape (preferred) and Portrait aspect ratios
-    const isPortrait = this.camera.aspect < 1.0;
-    const portraitFovBoost = isPortrait ? THREE.MathUtils.clamp((1.0 - this.camera.aspect) * 26, 0, 15) : 0;
-    const baseFov = (this.nitroActive ? 78 : 60 + Math.max(0, (this.speedMs - 25) * 0.22)) + portraitFovBoost;
+    // Third-person chase camera tuned for full-screen horizontal Landscape gameplay
+    const narrowPadFov =
+      this.camera.aspect < 1.25 ? THREE.MathUtils.clamp((1.25 - this.camera.aspect) * 18, 0, 10) : 0;
+    const baseFov =
+      (this.nitroActive ? 78 : 60 + Math.max(0, (this.speedMs - 22) * 0.22)) + narrowPadFov;
     this.camera.fov = THREE.MathUtils.damp(this.camera.fov, baseFov, 6, dt);
     this.camera.updateProjectionMatrix();
 
@@ -1150,17 +1166,15 @@ export class StarCarEngine {
     const shakeX = (Math.random() - 0.5) * this.cameraShake * 0.45;
     const shakeY = (Math.random() - 0.5) * this.cameraShake * 0.35;
 
-    const baseCamY = isPortrait ? 2.95 : 2.52;
-    const baseCamZ = isPortrait ? 7.35 : 6.1;
     _camTargetPos.set(
-      this.playerX * (isPortrait ? 0.86 : 0.78) + shakeX,
-      baseCamY + (this.nitroActive ? -0.16 : 0) + suspensionOffsetY * 0.45 + shakeY,
-      baseCamZ + (this.nitroActive ? 0.5 : 0)
+      this.playerX * 0.78 + shakeX,
+      2.52 + (this.nitroActive ? -0.16 : 0) + suspensionOffsetY * 0.45 + shakeY,
+      6.1 + (this.nitroActive ? 0.5 : 0)
     );
     this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, _camTargetPos.x, 9, dt);
     this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, _camTargetPos.y, 9, dt);
     this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, _camTargetPos.z, 9, dt);
-    _camLookAt.set(this.playerX * 0.9, isPortrait ? 0.88 : 0.96, -14);
+    _camLookAt.set(this.playerX * 0.9, 0.96, -14);
     this.camera.lookAt(_camLookAt);
 
     // World scrolling
@@ -1294,9 +1308,9 @@ export class StarCarEngine {
       isOffroad
     );
 
-    // Emit HUD at ~30Hz for ultra-smooth live digital speedometer needle & digits
+    // Emit HUD at ~40Hz for responsive live digital speedometer digits & needle
     this.hudEmitAccum += dt;
-    if (this.hudEmitAccum >= 0.033) {
+    if (this.hudEmitAccum >= 0.025) {
       this.hudEmitAccum = 0;
       this.emitHud();
     }
@@ -1346,16 +1360,11 @@ export class StarCarEngine {
       this.showcaseAngle += dt * autoSpeed;
     }
 
-    const isPortrait = this.camera.aspect < 1.0;
-    const dist =
-      (this.gameState === 'MAIN_MENU' ? 5.8 : 5.3) * (isPortrait ? 1.24 : 1.0);
-    const camHeight =
-      (this.gameState === 'MAIN_MENU' ? 1.82 : 1.7) * (isPortrait ? 1.1 : 1.0);
+    const dist = this.gameState === 'MAIN_MENU' ? 5.8 : 5.3;
+    const camHeight = this.gameState === 'MAIN_MENU' ? 1.82 : 1.7;
     const lookOffsetY =
       this.gameState === 'GARAGE' || this.gameState === 'STORE' || this.gameState === 'CUSTOMIZATION'
-        ? isPortrait
-          ? 0.28
-          : 0.35
+        ? 0.35
         : 0.52;
 
     _camTargetPos.set(
@@ -1366,8 +1375,7 @@ export class StarCarEngine {
     this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, _camTargetPos.x, 7, dt);
     this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, _camTargetPos.y, 7, dt);
     this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, _camTargetPos.z, 7, dt);
-    const showcaseFov = isPortrait ? 60 : 52;
-    this.camera.fov = THREE.MathUtils.damp(this.camera.fov, showcaseFov, 6, dt);
+    this.camera.fov = THREE.MathUtils.damp(this.camera.fov, 52, 6, dt);
     this.camera.updateProjectionMatrix();
 
     _camLookAt.set(0, lookOffsetY, 0);

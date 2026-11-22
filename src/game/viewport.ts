@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export type ScreenOrientationMode = 'portrait' | 'landscape';
+export type ScreenOrientationMode = 'landscape';
 
 export interface ViewportInfo {
   width: number;
@@ -30,7 +30,7 @@ export function isDocumentFullscreen(): boolean {
   return Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
 }
 
-export async function toggleAppFullscreen(preferLandscape = false): Promise<boolean> {
+export async function toggleAppFullscreen(preferLandscape = true): Promise<boolean> {
   const doc = document as Document & {
     webkitFullscreenElement?: Element | null;
     webkitExitFullscreen?: () => Promise<void> | void;
@@ -45,12 +45,6 @@ export async function toggleAppFullscreen(preferLandscape = false): Promise<bool
         await doc.exitFullscreen();
       } else if (doc.webkitExitFullscreen) {
         await doc.webkitExitFullscreen();
-      }
-      try {
-        const ori = screen.orientation as ScreenOrientation & { unlock?: () => void };
-        ori?.unlock?.();
-      } catch {
-        // Ignore unsupported orientation unlock
       }
       return false;
     }
@@ -83,24 +77,14 @@ export async function tryLockLandscape(): Promise<void> {
   }
 }
 
-export async function tryUnlockOrientation(): Promise<void> {
-  try {
-    const ori = screen.orientation as ScreenOrientation & { unlock?: () => void };
-    ori?.unlock?.();
-  } catch {
-    // Ignore unsupported orientation unlock
-  }
-}
-
 export function useViewportOrientation(): ViewportInfo {
   const [info, setInfo] = useState<ViewportInfo>(() => {
     const { width, height } = readViewportDimensions();
-    const orientation: ScreenOrientationMode = width >= height ? 'landscape' : 'portrait';
     return {
       width,
       height,
-      orientation,
-      isCompactLandscape: orientation === 'landscape' && height < 520,
+      orientation: 'landscape',
+      isCompactLandscape: Math.min(width, height) < 520,
       isFullscreen: isDocumentFullscreen(),
       fullscreenSupported: isFullscreenSupported(),
     };
@@ -110,17 +94,17 @@ export function useViewportOrientation(): ViewportInfo {
     let timer1 = 0;
     let timer2 = 0;
 
+    void tryLockLandscape();
+
     const sync = () => {
       const { width, height } = readViewportDimensions();
-      const orientation: ScreenOrientationMode = width >= height ? 'landscape' : 'portrait';
-      const isCompactLandscape = orientation === 'landscape' && height < 520;
+      const isCompactLandscape = Math.min(width, height) < 520;
       const isFullscreen = isDocumentFullscreen();
 
       setInfo((prev) => {
         if (
           prev.width === width &&
           prev.height === height &&
-          prev.orientation === orientation &&
           prev.isCompactLandscape === isCompactLandscape &&
           prev.isFullscreen === isFullscreen
         ) {
@@ -129,7 +113,7 @@ export function useViewportOrientation(): ViewportInfo {
         return {
           width,
           height,
-          orientation,
+          orientation: 'landscape',
           isCompactLandscape,
           isFullscreen,
           fullscreenSupported: isFullscreenSupported(),
@@ -141,7 +125,6 @@ export function useViewportOrientation(): ViewportInfo {
       sync();
       clearTimeout(timer1);
       clearTimeout(timer2);
-      // Android Chrome updates visualViewport dimensions slightly after orientationchange fires
       timer1 = window.setTimeout(sync, 100);
       timer2 = window.setTimeout(sync, 280);
     };

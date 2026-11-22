@@ -707,7 +707,8 @@ export function buildPlayerCar(
       }
     },
     setBraking: (braking: boolean) => {
-      taillightMat.emissiveIntensity = braking ? 3.2 : 1.1;
+      taillightMat.emissive.setHex(braking ? 0xff2424 : 0xef4444);
+      taillightMat.emissiveIntensity = braking ? 5.2 : 0.9;
     },
     setNitro: (active: boolean, time: number) => {
       for (let i = 0; i < nitroFlames.length; i++) {

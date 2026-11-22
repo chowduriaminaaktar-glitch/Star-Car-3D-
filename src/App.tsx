@@ -21,9 +21,11 @@ import {
   useViewportOrientation,
 } from './game/viewport';
 import {
+  addAndroidCoins,
   notifyAndroidGameReady,
   notifyAndroidGameplayMode,
   requestAndroidExit,
+  spendAndroidCoins,
 } from './game/androidBridge';
 import { MainMenu } from './components/MainMenu';
 import { LevelSelectScreen } from './components/LevelSelectScreen';
@@ -112,9 +114,10 @@ export default function App() {
           setHud(snapshot);
         },
         onCoinCollected: (amount) => {
+          const nativeNext = addAndroidCoins(amount);
           updateSave((prev) => ({
             ...prev,
-            coins: prev.coins + amount,
+            coins: nativeNext !== null ? nativeNext : prev.coins + amount,
           }));
         },
         onGameOver: (endHud) => {
@@ -246,9 +249,33 @@ export default function App() {
     setGameState('PLAYING');
   };
 
-  const handleToggleFullscreen = (preferLandscape: boolean) => {
-    void toggleAppFullscreen(preferLandscape);
-  };
+  const handleToggleFullscreen = useCallback(() => {
+    void toggleAppFullscreen(true);
+  }, []);
+
+  const handleSteerLeft = useCallback(() => {
+    engineRef.current?.steerLeft();
+  }, []);
+
+  const handleSteerRight = useCallback(() => {
+    engineRef.current?.steerRight();
+  }, []);
+
+  const handleThrottleChange = useCallback((active: boolean) => {
+    engineRef.current?.setThrottle(active);
+  }, []);
+
+  const handleBrakeChange = useCallback((active: boolean) => {
+    engineRef.current?.setBrake(active);
+  }, []);
+
+  const handleNitroTap = useCallback(() => {
+    engineRef.current?.triggerNitroTap();
+  }, []);
+
+  const handleClearAllInputs = useCallback(() => {
+    engineRef.current?.clearHeldInputs();
+  }, []);
 
   const handleOpenStore = () => {
     setPreviewCarId(saveData.selectedCarId);
@@ -275,12 +302,15 @@ export default function App() {
   const handleBuyCar = (car: CarSpec) => {
     if (saveData.ownedCarIds.includes(car.id)) return;
     if (saveData.coins < car.price) return;
+    const nativeAfterSpend = spendAndroidCoins(car.price);
+    if (nativeAfterSpend === -1) return;
     audioEngine.playPurchase();
     updateSave((prev) => {
-      if (prev.ownedCarIds.includes(car.id) || prev.coins < car.price) return prev;
+      if (prev.ownedCarIds.includes(car.id)) return prev;
+      if (nativeAfterSpend === null && prev.coins < car.price) return prev;
       return {
         ...prev,
-        coins: prev.coins - car.price,
+        coins: nativeAfterSpend !== null ? nativeAfterSpend : prev.coins - car.price,
         ownedCarIds: [...prev.ownedCarIds, car.id],
         selectedCarId: car.id,
       };
@@ -302,7 +332,10 @@ export default function App() {
     newlyUnlocked: string[]
   ) => {
     if (saveData.coins < totalCost) return;
+    let nativeAfterSpend: number | null = null;
     if (totalCost > 0) {
+      nativeAfterSpend = spendAndroidCoins(totalCost);
+      if (nativeAfterSpend === -1) return;
       audioEngine.playPurchase();
     } else {
       audioEngine.playClick();
@@ -313,7 +346,10 @@ export default function App() {
       const mergedKeys = Array.from(new Set([...prev.unlockedCustomKeys, ...newlyUnlocked]));
       return {
         ...prev,
-        coins: Math.max(0, prev.coins - totalCost),
+        coins:
+          nativeAfterSpend !== null
+            ? nativeAfterSpend
+            : Math.max(0, prev.coins - totalCost),
         unlockedCustomKeys: mergedKeys,
         customizationsByCar: {
           ...prev.customizationsByCar,
@@ -415,7 +451,7 @@ export default function App() {
               weatherMode: mode,
             })
           }
-          onToggleFullscreen={() => handleToggleFullscreen(false)}
+          onToggleFullscreen={handleToggleFullscreen}
         />
       )}
 
@@ -443,19 +479,19 @@ export default function App() {
           viewport={viewport}
           onPause={() => {
             audioEngine.playClick();
-            engineRef.current?.clearHeldInputs();
+            handleClearAllInputs();
             setGameState('PAUSED');
           }}
           onToggleFullscreen={() => {
             audioEngine.playClick();
-            handleToggleFullscreen(true);
+            handleToggleFullscreen();
           }}
-          onSteerLeft={() => engineRef.current?.steerLeft()}
-          onSteerRight={() => engineRef.current?.steerRight()}
-          onThrottleChange={(active) => engineRef.current?.setThrottle(active)}
-          onBrakeChange={(active) => engineRef.current?.setBrake(active)}
-          onNitroTap={() => engineRef.current?.triggerNitroTap()}
-          onClearAllInputs={() => engineRef.current?.clearHeldInputs()}
+          onSteerLeft={handleSteerLeft}
+          onSteerRight={handleSteerRight}
+          onThrottleChange={handleThrottleChange}
+          onBrakeChange={handleBrakeChange}
+          onNitroTap={handleNitroTap}
+          onClearAllInputs={handleClearAllInputs}
         />
       )}
 

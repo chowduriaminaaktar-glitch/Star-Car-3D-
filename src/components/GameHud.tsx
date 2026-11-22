@@ -51,6 +51,8 @@ function TapActionButton({
   children,
 }: TapActionButtonProps) {
   const [pressed, setPressed] = useState(false);
+  const onTapRef = useRef(onTap);
+  onTapRef.current = onTap;
   const activePointerIdRef = useRef<number | null>(null);
   const suppressNextClickRef = useRef(false);
   const suppressResetTimerRef = useRef<number | null>(null);
@@ -67,7 +69,7 @@ function TapActionButton({
     suppressResetTimerRef.current = window.setTimeout(() => {
       suppressNextClickRef.current = false;
       suppressResetTimerRef.current = null;
-    }, 280);
+    }, 320);
   };
 
   useEffect(() => {
@@ -100,7 +102,7 @@ function TapActionButton({
         suppressNextClickRef.current = true;
         activePointerIdRef.current = e.pointerId;
         setPressed(true);
-        onTap();
+        onTapRef.current();
       }}
       onPointerUp={(e) => {
         e.preventDefault();
@@ -117,8 +119,14 @@ function TapActionButton({
           scheduleSuppressReset();
         }
       }}
+      onLostPointerCapture={(e) => {
+        if (activePointerIdRef.current === null || activePointerIdRef.current === e.pointerId) {
+          activePointerIdRef.current = null;
+          setPressed(false);
+        }
+      }}
       onPointerLeave={(e) => {
-        if (e.pointerType === 'mouse') {
+        if (e.pointerType === 'mouse' && activePointerIdRef.current === e.pointerId) {
           activePointerIdRef.current = null;
           setPressed(false);
         }
@@ -131,7 +139,7 @@ function TapActionButton({
           clearSuppressTimer();
           return;
         }
-        onTap();
+        onTapRef.current();
       }}
       className={`select-none touch-none outline-none cursor-pointer transition-transform duration-75 ${
         pressed ? 'scale-92 brightness-115' : 'scale-100 hover:brightness-105'
@@ -152,9 +160,9 @@ interface HoldControlProps {
 
 /**
  * Multitouch hold pedal button (Accelerator & Brake).
- * Uses Pointer Events + setPointerCapture keyed by each button's own pointerId
- * so two thumbs can hold Accelerator and tap Steering/Nitro simultaneously
- * without ever sticking or cancelling each other.
+ * Uses stable callback ref + Pointer Events + setPointerCapture keyed by each
+ * button's own pointerId so 40Hz HUD updates never tear down or release held
+ * pedals, while still guaranteeing clean release on up/cancel/lostcapture/blur.
  */
 function HoldControlButton({
   label,
@@ -163,51 +171,60 @@ function HoldControlButton({
   children,
 }: HoldControlProps) {
   const [pressed, setPressed] = useState(false);
+  const onHoldChangeRef = useRef(onHoldChange);
+  onHoldChangeRef.current = onHoldChange;
   const activeRef = useRef(false);
   const activePointerIdRef = useRef<number | null>(null);
 
-  const release = useCallback(() => {
+  const release = useCallback((pointerId?: number) => {
+    if (
+      pointerId !== undefined &&
+      activePointerIdRef.current !== null &&
+      activePointerIdRef.current !== pointerId
+    ) {
+      return;
+    }
+    activePointerIdRef.current = null;
     if (!activeRef.current) return;
     activeRef.current = false;
-    activePointerIdRef.current = null;
     setPressed(false);
-    onHoldChange(false);
-  }, [onHoldChange]);
+    onHoldChangeRef.current(false);
+  }, []);
 
-  const engage = useCallback(
-    (pointerId: number) => {
-      activePointerIdRef.current = pointerId;
-      if (activeRef.current) return;
-      activeRef.current = true;
-      setPressed(true);
-      onHoldChange(true);
-    },
-    [onHoldChange]
-  );
+  const engage = useCallback((pointerId: number) => {
+    activePointerIdRef.current = pointerId;
+    if (activeRef.current) return;
+    activeRef.current = true;
+    setPressed(true);
+    onHoldChangeRef.current(true);
+  }, []);
 
   useEffect(() => {
     const handleGlobalBlur = () => release();
     const handleVisibilityChange = () => {
       if (document.hidden) release();
     };
-    const handleGlobalPointerCancel = (e: PointerEvent) => {
-      if (activePointerIdRef.current === null || activePointerIdRef.current === e.pointerId) {
-        release();
+    const handleGlobalPointerEnd = (e: PointerEvent) => {
+      if (activePointerIdRef.current !== null && activePointerIdRef.current === e.pointerId) {
+        release(e.pointerId);
       }
     };
     window.addEventListener('blur', handleGlobalBlur);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pointercancel', handleGlobalPointerCancel);
+    window.addEventListener('pointerup', handleGlobalPointerEnd);
+    window.addEventListener('pointercancel', handleGlobalPointerEnd);
     return () => {
       window.removeEventListener('blur', handleGlobalBlur);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pointercancel', handleGlobalPointerCancel);
+      window.removeEventListener('pointerup', handleGlobalPointerEnd);
+      window.removeEventListener('pointercancel', handleGlobalPointerEnd);
       if (activeRef.current) {
         activeRef.current = false;
-        onHoldChange(false);
+        activePointerIdRef.current = null;
+        onHoldChangeRef.current(false);
       }
     };
-  }, [onHoldChange, release]);
+  }, [release]);
 
   return (
     <button
@@ -227,21 +244,28 @@ function HoldControlButton({
       }}
       onPointerUp={(e) => {
         e.preventDefault();
-        if (activePointerIdRef.current === null || activePointerIdRef.current === e.pointerId) {
-          release();
-        }
+        release(e.pointerId);
       }}
       onPointerCancel={(e) => {
         e.preventDefault();
-        if (activePointerIdRef.current === null || activePointerIdRef.current === e.pointerId) {
-          release();
-        }
+        release(e.pointerId);
       }}
-      onLostPointerCapture={() => release()}
+      onLostPointerCapture={(e) => {
+        release(e.pointerId);
+      }}
       onPointerLeave={(e) => {
         if (e.pointerType === 'mouse') {
-          release();
+          const hasCap =
+            typeof e.currentTarget.hasPointerCapture === 'function' &&
+            e.currentTarget.hasPointerCapture(e.pointerId);
+          if (!hasCap) {
+            release(e.pointerId);
+          }
         }
+      }}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
       }}
       className={`select-none touch-none outline-none cursor-pointer transition-transform duration-75 ${
         pressed ? 'scale-92 brightness-115' : 'scale-100 hover:brightness-105'
@@ -707,29 +731,29 @@ function DigitalSpeedometer({
   );
 }
 
-function getControlDimensions(size: ControlButtonSize, compactLand: boolean, isPortrait: boolean) {
+function getControlDimensions(size: ControlButtonSize, compactLand: boolean) {
   if (size === 'SMALL') {
     return {
-      steer: compactLand || isPortrait ? 'w-14 h-14' : 'w-16 h-16 sm:w-18 sm:h-18',
-      brake: compactLand || isPortrait ? 'w-14 h-14' : 'w-16 h-15 sm:w-18 sm:h-17',
-      accel: compactLand || isPortrait ? 'w-15 h-19' : 'w-17 h-22 sm:w-19 sm:h-24',
-      nitro: compactLand || isPortrait ? 'w-13 h-13' : 'w-14 h-14 sm:w-16 sm:h-16',
+      steer: compactLand ? 'w-14 h-14' : 'w-16 h-16 sm:w-18 sm:h-18',
+      brake: compactLand ? 'w-14 h-14' : 'w-16 h-15 sm:w-18 sm:h-17',
+      accel: compactLand ? 'w-15 h-19' : 'w-17 h-22 sm:w-19 sm:h-24',
+      nitro: compactLand ? 'w-13 h-13' : 'w-14 h-14 sm:w-16 sm:h-16',
     };
   }
   if (size === 'LARGE') {
     return {
-      steer: compactLand || isPortrait ? 'w-20 h-20' : 'w-22 h-22 sm:w-26 sm:h-26',
-      brake: compactLand || isPortrait ? 'w-19 h-18' : 'w-21 h-20 sm:w-23 sm:h-22',
-      accel: compactLand || isPortrait ? 'w-20 h-25' : 'w-22 h-28 sm:w-25 sm:h-31',
-      nitro: compactLand || isPortrait ? 'w-17 h-17' : 'w-19 h-19 sm:w-21 sm:h-21',
+      steer: compactLand ? 'w-20 h-20' : 'w-22 h-22 sm:w-26 sm:h-26',
+      brake: compactLand ? 'w-19 h-18' : 'w-21 h-20 sm:w-23 sm:h-22',
+      accel: compactLand ? 'w-20 h-25' : 'w-22 h-28 sm:w-25 sm:h-31',
+      nitro: compactLand ? 'w-17 h-17' : 'w-19 h-19 sm:w-21 sm:h-21',
     };
   }
   // MEDIUM (ergonomic default)
   return {
-    steer: compactLand || isPortrait ? 'w-17 h-17 sm:w-20 sm:h-20' : 'w-20 h-20 sm:w-23 sm:h-23',
-    brake: compactLand || isPortrait ? 'w-16 h-16 sm:w-18 sm:h-17' : 'w-18 h-17 sm:w-20 sm:h-19',
-    accel: compactLand || isPortrait ? 'w-17 h-22 sm:w-19 sm:h-24' : 'w-19 h-24 sm:w-22 sm:h-27',
-    nitro: compactLand || isPortrait ? 'w-15 h-15 sm:w-16 sm:h-16' : 'w-16 h-16 sm:w-18 sm:h-18',
+    steer: compactLand ? 'w-17 h-17 sm:w-20 sm:h-20' : 'w-20 h-20 sm:w-23 sm:h-23',
+    brake: compactLand ? 'w-16 h-16 sm:w-18 sm:h-17' : 'w-18 h-17 sm:w-20 sm:h-19',
+    accel: compactLand ? 'w-17 h-22 sm:w-19 sm:h-24' : 'w-19 h-24 sm:w-22 sm:h-27',
+    nitro: compactLand ? 'w-15 h-15 sm:w-16 sm:h-16' : 'w-16 h-16 sm:w-18 sm:h-18',
   };
 }
 
@@ -768,8 +792,7 @@ export function GameHud({
 }: GameHudProps) {
   const [controlsHidden, setControlsHidden] = useState(false);
   const compactLand = viewport.isCompactLandscape;
-  const isPortrait = viewport.orientation === 'portrait';
-  const dims = getControlDimensions(settings.controlSize, compactLand, isPortrait);
+  const dims = getControlDimensions(settings.controlSize, compactLand);
   const safePad = getSafeAreaPadding(settings.controlPosition);
   const activeLevelSpec = LEVEL_CATALOG.find((l) => l.id === hud.levelId) ?? LEVEL_CATALOG[0];
 
@@ -919,18 +942,6 @@ export function GameHud({
         </div>
       </div>
 
-      {/* Portrait Speedometer positioned cleanly centered above two-thumb controls */}
-      {isPortrait && (
-        <div className="relative z-10 flex justify-center mt-auto mb-1">
-          <DigitalSpeedometer
-            speedKmh={hud.speedKmh}
-            topSpeedKmh={hud.topSpeedKmh}
-            nitroActive={hud.nitroActive}
-            compact
-          />
-        </div>
-      )}
-
       {/* Two-Handed Ergonomic Bottom Controls Layer + Center Speedometer */}
       <div className="relative z-10 flex items-end justify-between gap-2 min-h-[120px]">
         {/* LEFT THUMB CONTROL AREA (Bottom-Left): Hide Toggle + Left/Right One-Tap Lane Buttons */}
@@ -970,16 +981,14 @@ export function GameHud({
         </div>
 
         {/* CENTER SPEEDOMETER (Bottom-Center in Landscape, clear of both thumb areas) */}
-        {!isPortrait && (
-          <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col items-center justify-end">
-            <DigitalSpeedometer
-              speedKmh={hud.speedKmh}
-              topSpeedKmh={hud.topSpeedKmh}
-              nitroActive={hud.nitroActive}
-              compact={compactLand}
-            />
-          </div>
-        )}
+        <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-0 flex flex-col items-center justify-end">
+          <DigitalSpeedometer
+            speedKmh={hud.speedKmh}
+            topSpeedKmh={hud.topSpeedKmh}
+            nitroActive={hud.nitroActive}
+            compact={compactLand}
+          />
+        </div>
 
         {/* RIGHT THUMB CONTROL AREA (Bottom-Right): Separate Nitro Tap above Brake & Accelerator */}
         {!controlsHidden && (

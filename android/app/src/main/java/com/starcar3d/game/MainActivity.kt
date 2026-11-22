@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var errorOverlay: LinearLayout
     private lateinit var errorMessageText: TextView
     private lateinit var retryButton: Button
+    private lateinit var coinManager: CoinManager
 
     private var keepSplashOnScreen = true
     private var gameReady = false
@@ -50,6 +51,9 @@ class MainActivity : AppCompatActivity() {
         splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
 
         super.onCreate(savedInstanceState)
+
+        // Force landscape-only orientation immediately from cold app launch across all screens
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
         // Extend behind display cutout (notch/camera hole) for true edge-to-edge racing
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -71,6 +75,7 @@ class MainActivity : AppCompatActivity() {
             loadLocalGame()
         }
 
+        coinManager = CoinManager(this)
         configureWebView()
         setupBackNavigation()
         applyImmersiveMode()
@@ -211,6 +216,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         webView.onResume()
         webView.resumeTimers()
         applyImmersiveMode()
@@ -255,12 +261,8 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun setGameplayMode(isGameplay: Boolean) {
             runOnUiThread {
-                // Prefer Landscape during active racing gameplay, allow full Portrait/Landscape in menus
-                requestedOrientation = if (isGameplay) {
-                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                } else {
-                    ActivityInfo.SCREEN_ORIENTATION_FULL_USER
-                }
+                // Keep landscape-only orientation throughout the entire app (menus, garage, and racing)
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                 applyImmersiveMode()
             }
         }
@@ -270,6 +272,26 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 finish()
             }
+        }
+
+        @JavascriptInterface
+        fun getCoins(): Int {
+            return coinManager.getCoins()
+        }
+
+        @JavascriptInterface
+        fun addCoins(amount: Int): Int {
+            return coinManager.addCoins(amount)
+        }
+
+        @JavascriptInterface
+        fun spendCoins(amount: Int): Int {
+            return coinManager.spendCoins(amount)
+        }
+
+        @JavascriptInterface
+        fun setCoins(amount: Int): Int {
+            return coinManager.setCoins(amount)
         }
     }
 }

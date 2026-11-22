@@ -51,7 +51,6 @@ export function LevelSelectScreen({
   onHoverLevel,
   onBack,
 }: LevelSelectScreenProps) {
-  const isPortrait = viewport.orientation === 'portrait';
   const compactLand = viewport.isCompactLandscape;
 
   return (
@@ -100,23 +99,13 @@ export function LevelSelectScreen({
         </div>
 
         <div className="shrink-0">
-          <CoinBadge coins={coins} compact={compactLand || isPortrait} />
+          <CoinBadge coins={coins} compact={compactLand} />
         </div>
       </div>
 
-      {/* Three Large Level Cards */}
-      <div
-        className={`flex-1 min-h-0 mt-3 sm:mt-5 ${
-          isPortrait ? 'overflow-y-auto pr-0.5' : 'flex items-stretch'
-        }`}
-      >
-        <div
-          className={`w-full max-w-6xl mx-auto grid gap-3 sm:gap-5 ${
-            isPortrait
-              ? 'grid-cols-1 pb-4'
-              : 'grid-cols-3 h-full max-h-[540px] my-auto'
-          }`}
-        >
+      {/* Three Large Level Cards (Landscape 3-Column Layout) */}
+      <div className="flex-1 min-h-0 mt-3 sm:mt-5 flex items-stretch">
+        <div className="w-full max-w-6xl mx-auto grid grid-cols-3 gap-3 sm:gap-5 h-full max-h-[540px] my-auto">
           {LEVEL_CATALOG.map((level, index) => {
             const stats = levelProgress[level.id] ?? { bestScore: 0, bestDistance: 0 };
             const isOffroad = level.id === 'OFFROAD';
@@ -149,9 +138,7 @@ export function LevelSelectScreen({
                 onMouseEnter={() => onHoverLevel?.(level.id)}
                 className={`group relative rounded-2xl overflow-hidden border border-white/15 bg-gradient-to-br ${
                   LEVEL_FALLBACK_GRADIENTS[level.id]
-                } ${borderAccent} shadow-2xl flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 ${
-                  isPortrait ? 'min-h-[210px]' : 'h-full'
-                }`}
+                } ${borderAccent} shadow-2xl flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 h-full`}
               >
                 {/* Unique Background Artwork */}
                 <img

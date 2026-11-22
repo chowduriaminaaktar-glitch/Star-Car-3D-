@@ -1,3 +1,5 @@
+import { getAndroidCoins } from './androidBridge';
+
 export type GameState =
   | 'MAIN_MENU'
   | 'LEVEL_SELECT'
@@ -393,7 +395,7 @@ export function createInitialSaveData(): SaveData {
     customizationsByCar[car.id] = getDefaultCustomization(car.id);
   }
   return {
-    coins: 250,
+    coins: 0,
     bestScore: 0,
     bestDistance: 0,
     levelProgress: {
@@ -411,9 +413,12 @@ export function createInitialSaveData(): SaveData {
 
 export function loadSaveData(): SaveData {
   const base = createInitialSaveData();
+  const nativeCoins = getAndroidCoins();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return base;
+    if (!raw) {
+      return nativeCoins !== null ? { ...base, coins: nativeCoins } : base;
+    }
     const parsed = JSON.parse(raw) as Partial<SaveData>;
     const owned = Array.isArray(parsed.ownedCarIds) && parsed.ownedCarIds.length > 0
       ? parsed.ownedCarIds.filter((id) => CAR_CATALOG.some((c) => c.id === id))
@@ -491,7 +496,12 @@ export function loadSaveData(): SaveData {
     };
 
     return {
-      coins: typeof parsed.coins === 'number' && parsed.coins >= 0 ? Math.floor(parsed.coins) : base.coins,
+      coins:
+        nativeCoins !== null
+          ? nativeCoins
+          : typeof parsed.coins === 'number' && parsed.coins >= 0
+            ? Math.floor(parsed.coins)
+            : base.coins,
       bestScore: typeof parsed.bestScore === 'number' ? Math.max(0, Math.floor(parsed.bestScore)) : 0,
       bestDistance: typeof parsed.bestDistance === 'number' ? Math.max(0, Math.floor(parsed.bestDistance)) : 0,
       levelProgress,
@@ -502,7 +512,7 @@ export function loadSaveData(): SaveData {
       settings: mergedSettings,
     };
   } catch {
-    return base;
+    return nativeCoins !== null ? { ...base, coins: nativeCoins } : base;
   }
 }
 

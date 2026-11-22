@@ -64,7 +64,6 @@ export function MainMenu({
   onSelectWeather,
   onToggleFullscreen,
 }: MainMenuProps) {
-  const isPortrait = viewport.orientation === 'portrait';
   const compactLand = viewport.isCompactLandscape;
 
   return (
@@ -84,7 +83,7 @@ export function MainMenu({
         <div className="flex items-start justify-between gap-2 sm:gap-4">
           {/* Top-Left: Coins + Best Score */}
           <div className="pointer-events-auto flex flex-col gap-1.5 shrink-0">
-            <CoinBadge coins={coins} compact={compactLand || isPortrait} />
+            <CoinBadge coins={coins} compact={compactLand} />
             {bestScore > 0 && (
               <div className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-200 bg-slate-950/88 border border-white/10 rounded-lg px-2.5 py-1 w-fit">
                 <Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -95,20 +94,18 @@ export function MainMenu({
             )}
           </div>
 
-          {/* Top-Center STAR CAR 3D Brand Logo in Landscape */}
-          {!isPortrait && (
-            <div className="flex flex-col items-center text-center select-none min-w-0 -mt-1">
-              <BrandLogo
-                size={compactLand ? 'heroCompact' : 'hero'}
-                glow
-                animateIn
-                priority
-              />
-              <p className="mt-0.5 text-[11px] sm:text-xs font-medium text-slate-200 tracking-wide drop-shadow truncate">
-                {selectedCar.name} · {selectedCar.classLabel}
-              </p>
-            </div>
-          )}
+          {/* Top-Center STAR CAR 3D Brand Logo (Landscape) */}
+          <div className="flex flex-col items-center text-center select-none min-w-0 -mt-1">
+            <BrandLogo
+              size={compactLand ? 'heroCompact' : 'hero'}
+              glow
+              animateIn
+              priority
+            />
+            <p className="mt-0.5 text-[11px] sm:text-xs font-medium text-slate-200 tracking-wide drop-shadow truncate">
+              {selectedCar.name} · {selectedCar.classLabel}
+            </p>
+          </div>
 
           {/* Top-Right Controls: Fullscreen, Day/Night, Settings */}
           <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -180,16 +177,6 @@ export function MainMenu({
             </button>
           </div>
         </div>
-
-        {/* Dedicated Top-Center Logo Row in Portrait so it never crowds Coins/Buttons */}
-        {isPortrait && (
-          <div className="flex flex-col items-center text-center select-none mt-1">
-            <BrandLogo size="hero" glow animateIn priority />
-            <p className="mt-1 text-xs sm:text-sm font-medium text-slate-200 tracking-wide drop-shadow">
-              {selectedCar.name} · {selectedCar.classLabel}
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Bottom Dock: Weather Strip + Navigation Actions */}
@@ -223,10 +210,10 @@ export function MainMenu({
           })}
         </div>
 
-        {/* Main Navigation Dock */}
+        {/* Main Navigation Dock (Landscape) */}
         <div
-          className={`bg-slate-950/92 border border-white/15 rounded-2xl shadow-2xl flex ${
-            isPortrait ? 'flex-col p-3 gap-2.5' : compactLand ? 'flex-row items-center p-2 gap-2' : 'flex-row items-center p-3.5 gap-3'
+          className={`bg-slate-950/92 border border-white/15 rounded-2xl shadow-2xl flex flex-row items-center ${
+            compactLand ? 'p-2 gap-2' : 'p-3.5 gap-3'
           }`}
         >
           <button
@@ -244,7 +231,7 @@ export function MainMenu({
             <span>START GAME</span>
           </button>
 
-          <div className={`grid grid-cols-3 gap-2 ${isPortrait ? 'w-full' : 'flex items-center shrink-0'}`}>
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => {
